@@ -43,6 +43,7 @@ function createMap(state) {
 
 var globalMapObj = undefined;
 var prevBounds = undefined;
+var locationMarker = undefined;
 
 function getMyMap() {
     if (typeof globalMapObj === "undefined") {
@@ -153,13 +154,13 @@ function handleZoom(e) {
 }
 
 function onLocationFound(e) {
-    var radius = e.accuracy;
     const mymap = getMyMap();
-
-    L.marker(e.latlng).addTo(mymap)
-        .bindPopup("You are within " + radius + " meters from this point");
-
-    L.circle(e.latlng, radius).addTo(mymap);
+    if (typeof locationMarker === "undefined") {
+        locationMarker = L.marker(e.latlng);
+        locationMarker.addTo(mymap);
+    } else {
+        locationMarker.setLatLng(e.latlng);
+    }
 }
 
 function flyToCity(name) {
