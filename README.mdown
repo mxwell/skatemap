@@ -1,0 +1,26 @@
+# Skate Map app
+
+The app helps to find skateable areas and paths in cities using Openstreetmap data. However required mapping (footways, cycleways) is scarce outside central parts of major cities and use of the app is limited at the moment.
+
+## Client
+
+The client is a web application. It uses [Leaflet](https://leafletjs.com/) for map rendering. The web application and the server (see below) both should be deployed with HTTPS support, because the client requests geolocation information from a browser and most modern browsers require secure connection to enable geolocation.
+
+Raster tiles for background are loaded from Openstreetmap, but tiles from Mapbox can be used too. Just place your token into `client/js/creds.js`:
+
+```
+const CONFIG_MAPBOX_TOKEN = "<HERE GOES YOUR TOKEN>";
+```
+
+## Server
+
+The application needs to load information on footways inside displayed area. We use a simple HTTP server written in C++ for this. It requires prepared file with footways data placed into the working directory as `footways.pbf`. The footways data is collected from Openstreetmap dump and converted into the protobuf-based [PBF format](https://wiki.openstreetmap.org/wiki/PBF_Format). There are a number of ways to accomplish this and one of them is the CLI tool [Osmosis](https://wiki.openstreetmap.org/wiki/Osmosis).
+
+### How to build
+
+Build is tested on Linux OS based on Ubuntu 16.04. Build target is a single binary.
+
+1. Install [bazel](https://bazel.build/)
+2. Go to directory: `cd server`
+3. Run build: `bazel build //riddimdim:riddimdim`
+4. Check result in `bazel-bin/riddimdim/riddimdim`

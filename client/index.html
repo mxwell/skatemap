@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/png" href="art/skatemap.png">
+  <title>Skate Map</title>
+  <link rel="stylesheet" href="js/vendor/leaflet/leaflet.css" />
+  <link rel="stylesheet" href="css/style.css" />
+  <script src="js/vendor/leaflet/leaflet.js"></script>
+  <script src="js/creds.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/riddimdim.js"></script>
+  <script src="js/map.js"></script>
+</head>
+<body>
+  <div class="wrapper">
+    <header class="main-head">
+      <a class="plain-link" href="/">SKATE MAP</a>
+      <select class="city_selector" onchange="citySelected()" accesskey="c">
+        <option selected value="moscow">Москва</option>
+        <option value="saint_petersburg">Санкт-Петербург</option>
+        <option value="saratov">Саратов</option>
+        <option value="tyumen">Тюмень</option>
+      </select>
+    </header>
+    <div id="mapid" class="content"></div>
+    <footer class="main-footer">
+      &copy; 2019 <a class="plain-link" href="https://github.com/mxwell">Мурат Хайрулин</a>
+      <br />
+      <a href="https://github.com/mxwell/skatemap"><small>source</small></a>
+    </footer>
+  </div>
+  <script src="js/main.js"></script>
+</body>
+</html>
