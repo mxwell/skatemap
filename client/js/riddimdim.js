@@ -22,6 +22,9 @@ function postToWaysApi(body, callback) {
 }
 
 function retrieveWaysForBboxes(bboxes, callback) {
+	if (bboxes.length <= 0) {
+		return;
+	}
 	var converted = [];
 	for (var i = 0 ; i < bboxes.length; ++i) {
 		converted.push(convertBbox(bboxes[i]));
