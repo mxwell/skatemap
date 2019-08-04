@@ -83,18 +83,96 @@ function extractWayProps(way) {
     };
 }
 
-var polylinesCache = {};
+class ListNode {
+    constructor(key, item) {
+        this.key = key;
+        this.item = item;
+        this.prev = null;
+        this.next = null;
+    }
+}
+
+/* based on https://chrisrng.svbtle.com/lru-cache-in-javascript */
+class LruCache {
+    constructor(capacity, removal) {
+        this.capacity = capacity;
+        this.removal = removal;
+        this.size = 0;
+        this.obj = {};
+        this.head = null;
+        this.tail = null;
+    }
+
+    setHead(node) {
+        node.prev = null;
+        node.next = this.head;
+        if (this.head !== null) {
+            this.head.prev = node;
+        }
+        this.head = node;
+        if (this.tail === null) {
+            this.tail = node;
+        }
+    }
+
+    unlink(node) {
+        if (node.prev !== null) {
+            node.prev.next = node.next;
+        } else {
+            this.head = node.next;
+        }
+        if (node.next !== null) {
+            node.next.prev = node.prev;
+        } else {
+            this.tail = node.prev;
+        }
+    }
+
+    add(key, item) {
+        if (this.size >= this.capacity) {
+            while (this.size > this.capacity * 0.9) {
+                var oldKey = this.tail.key;
+                this.removal(this.obj[oldKey].item);
+                delete this.obj[oldKey];
+                this.size--;
+                this.tail = this.tail.prev;
+                this.tail.next = null;
+            }
+        }
+        var node = new ListNode(key, item);
+        this.setHead(node);
+        this.size++;
+        this.obj[node.key] = node;
+    }
+
+    has(key) {
+        return key in this.obj;
+    }
+
+    get(key) {
+        var node = this.obj[key];
+        var item = node.item;
+        this.unlink(node);
+        this.setHead(node);
+        return item;
+    }
+}
+
+var polylinesCache = new LruCache(6000, function(item) {
+    // remove line from its layer
+    item.remove();
+});
 
 function getPolylineByNum(way, way_num) {
-    if (!(way_num in polylinesCache)) {
+    if (!polylinesCache.has(way_num)) {
         const nodes = way.nodes;
         const props = extractWayProps(way);
         var polyline = L.polyline(nodes, props);
         const style = STYLE_SET_BY_GRADE[props.grade];
         polyline.setStyle(style);
-        polylinesCache[way_num] = polyline;
+        polylinesCache.add(way_num, polyline);
     }
-    return polylinesCache[way_num];
+    return polylinesCache.get(way_num);
 }
 
 var SurfaceInfo = L.control();

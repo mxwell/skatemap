@@ -137,6 +137,12 @@ function saveBounds() {
 }
 
 function drawWays() {
+    const mymap = getMyMap();
+    const zoom = mymap.getZoom();
+    if (zoom < 15) {
+        console.log(`Not loading new ways at zoom ${zoom} < 15`);
+        return;
+    }
     const bboxes = getNewBboxes();
     const data = retrieveWaysForBboxes(bboxes, receiveWaysData);
     saveBounds();
@@ -146,10 +152,6 @@ function handleZoom(e) {
     const nextState = getStateFromMap();
     const nextPath = stateToUrl(nextState);
     window.history.replaceState(nextState, "", nextPath);
-    if (nextState.zoom < 15) {
-        console.log(`Not loading new ways at zoom ${nextState.zoom} < 15`);
-        return;
-    }
     drawWays();
 }
 
