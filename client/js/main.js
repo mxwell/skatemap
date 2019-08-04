@@ -163,6 +163,8 @@ function onLocationFound(e) {
     } else {
         locationMarker.setLatLng(e.latlng);
     }
+    var selector = document.getElementsByClassName("city_selector")[0];
+    selector.value = "no";
 }
 
 function flyToCity(name) {
