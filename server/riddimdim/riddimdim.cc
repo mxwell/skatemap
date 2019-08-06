@@ -3,9 +3,11 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include <thread>
 #include <unordered_map>
 
 #include <arpa/inet.h>
+#include <unistd.h>
 
 #include <google/protobuf/io/coded_stream.h>
 #include <google/protobuf/io/gzip_stream.h>
@@ -26,6 +28,8 @@ using json = nlohmann::json;
 
 const int kApiPort = 8082;
 const string kMapDataPath = "footways.pbf";
+const string kStatePath = "state.txt";
+const int kReloadPeriodSeconds = 15 * 60;
 
 class StreamBuffer {
     istream &stream;
@@ -57,8 +61,8 @@ public:
 
     template<class T>
     bool ParseMessage(T &message) {
-        CodedInputStream* coded_stream = new CodedInputStream(buffer, buffer_size);
-        if (!message.ParseFromCodedStream(coded_stream)) {
+        CodedInputStream coded_stream(buffer, buffer_size);
+        if (!message.ParseFromCodedStream(&coded_stream)) {
             cerr << "failed to parse message" << endl;
             return false;
         }
@@ -121,7 +125,7 @@ class FileBlockReader {
     ifstream binary_stream;
     int blob_header_size;
     OSMPBF::BlobHeader blob_header;
-    StreamBuffer *stream_buffer;
+    shared_ptr<StreamBuffer> stream_buffer;
     string block_type;
     int blob_size;
     OSMPBF::Blob blob;
@@ -187,10 +191,7 @@ public:
     FileBlockReader(const string& data_path) {
         binary_stream = ifstream(data_path.c_str(), ios::binary);
         assert(binary_stream.is_open());
-        stream_buffer = new StreamBuffer(binary_stream);
-    }
-    ~FileBlockReader() {
-        delete stream_buffer;
+        stream_buffer = make_shared<StreamBuffer>(binary_stream);
     }
 
     bool ReadBlock() {
@@ -283,121 +284,86 @@ vector<OsmModel::NodeHolder> ReadDenseNodes(const OSMPBF::DenseNodes &proto_node
     return result;
 }
 
-struct OsmDataHolder {
+int64_t ReadState(const string& state_path) {
+    ifstream state_reader(state_path);
+    assert(state_reader);
+    int64_t result;
+    state_reader >> result;
+    assert(result >= 1000000000);  // sanity check
+    return result;
+}
+
+struct OsmData {
     StringTable strings;
     NodesMap nodes;
     Grid<int64_t, int> grid;
     int skipped_ways = 0;
     int partial_ways = 0;
+    int64_t state = 0;
 
-    OsmDataHolder(int cell_size) :
+    OsmData(int cell_size) :
         grid(cell_size)
     {}
 };
 
-OsmDataHolder OpenPbfData2(const string& data_path) {
+typedef shared_ptr<OsmData> OsmDataHolder;
+
+OsmDataHolder OpenPbfData2(const string& data_path, const string& state_path) {
+    cout << "Loading data from " << data_path << " and " << state_path << endl;
     FileBlockReader reader(data_path);
-    OsmDataHolder result(1e4);
+    OsmDataHolder osm_data = make_shared<OsmData>(1e4);
+    osm_data->state = ReadState(state_path);
     while (reader.ReadBlock()) {
         if (reader.GetType() == kOSMData) {
             const OSMPBF::PrimitiveBlock& block = reader.GetPrimitiveBlock();
             const OSMPBF::StringTable& table = block.stringtable();
             int m = table.s_size();
-            int stringTableOffset = result.strings.size();
+            int stringTableOffset = osm_data->strings.size();
             if (m) {
                 for (int i = 0; i < m; ++i) {
-                    result.strings.push_back(make_shared<string>(table.s(i)));
+                    osm_data->strings.push_back(make_shared<string>(table.s(i)));
                 }
             }
             int n = block.primitivegroup_size();
-            cout << "Found OSMData: " << n << " group(s)" << endl;
+            // cout << "Found OSMData: " << n << " group(s)" << endl;
             for (int i = 0; i < n; ++i) {
                 const OSMPBF::PrimitiveGroup& group = block.primitivegroup(i);
                 if (group.has_dense()) {
-                    cout << "  - dense nodes: " << group.dense().id_size() << endl;
+                    // cout << "  - dense nodes: " << group.dense().id_size() << endl;
                     vector<shared_ptr<OsmModel::Node>> nodes = ReadDenseNodes(group.dense());
                     for (auto ptr : nodes) {
-                        result.nodes[ptr->GetId()] = ptr;
+                        osm_data->nodes[ptr->GetId()] = ptr;
                     }
                 }
-                cout << "  - nodes: " << group.nodes_size() << ", ways: " << group.ways_size() << ", relations: " << group.relations_size() << endl;
+                // cout << "  - nodes: " << group.nodes_size() << ", ways: " << group.ways_size() << ", relations: " << group.relations_size() << endl;
                 if (group.nodes_size()) {
                     cerr << "Parsing of regular nodes is not supported yet. Abort." << endl;
                     exit(1);
                 }
                 for (int j = 0; j < group.ways_size(); ++j) {
                     bool broken = false;
-                    OsmModel::WayHolder way = ReadWay(group.ways(j), result.nodes, result.strings, stringTableOffset, &broken);
+                    OsmModel::WayHolder way = ReadWay(group.ways(j), osm_data->nodes, osm_data->strings, stringTableOffset, &broken);
                     if (!way) {
-                        ++result.skipped_ways;
+                        ++osm_data->skipped_ways;
                         continue;
                     }
                     if (broken) {
-                        ++result.partial_ways;
+                        ++osm_data->partial_ways;
                     }
-                    result.grid.AddWay(way);
+                    osm_data->grid.AddWay(way);
                 }
             }
         } else {
-            cout << reader.GetType() << endl;
+            // cout << reader.GetType() << endl;
         }
     }
-    cout << "Total number of strings: " << result.strings.size() << endl;
-    cout << "Total number of nodes: " << result.nodes.size() << endl;
-    cout << "Total number of ways: " << result.grid.CountWays() << endl;
-    cout << "Number of skipped ways: " << result.skipped_ways << endl;
-    cout << "Number of partial ways: " << result.partial_ways << endl;
-    return result;
-}
-
-bool OpenPbfData(const string& data_path) {
-    ifstream binary_stream(data_path.c_str(), ios::binary);
-    uint32_t blob_header_size;
-    {
-        uint32_t blob_header_length;
-        binary_stream.read((char*) (&blob_header_length), sizeof(blob_header_length));
-        if (!binary_stream) {
-            cerr << "only " << binary_stream.gcount() << " bytes are read" << endl;
-            exit(1);
-        }
-        blob_header_size = ntohl(blob_header_length);
-    }
-    cout << "size of BlobHeader: " << blob_header_size << endl;
-
-    StreamBuffer buffer(binary_stream);
-    buffer.Read(blob_header_size);
-    OSMPBF::BlobHeader blob_header;
-    if (!buffer.ParseMessage(blob_header)) {
-        cerr << "failed to parse blob header" << endl;
-        return false;
-    }
-    cout << "Type: " << blob_header.type() << endl;
-    int blob_size = blob_header.datasize();
-    cout << "size of Blob: " << blob_size << endl;
-
-    buffer.Read(blob_size);
-    OSMPBF::Blob blob;
-    if (!buffer.ParseMessage(blob)) {
-        cerr << "failed to parse blob" << endl;
-        return false;
-    }
-    cout << blob.raw_size() << endl;
-    if (blob.has_zlib_data()) {
-        const string& zlib_data = blob.zlib_data();
-        ZlibBuffer zbuffer(zlib_data);
-        if (blob_header.type() == "OSMHeader") {
-            OSMPBF::HeaderBlock header_block;
-            if (!zbuffer.ParseMessage(header_block)) {
-                cerr << "failed to parse HeaderBlock" << endl;
-                return false;
-            }
-            //PrintHeaderBlock(header_block);
-        } else {
-            cout << "not supported fileblock type" << endl;
-        }
-    }
-
-    return true;
+    cout << "State " << osm_data->state << ":" << endl;
+    cout << "  Total number of strings: " << osm_data->strings.size() << endl;
+    cout << "  Total number of nodes: " << osm_data->nodes.size() << endl;
+    cout << "  Total number of ways: " << osm_data->grid.CountWays() << endl;
+    cout << "  Number of skipped ways: " << osm_data->skipped_ways << endl;
+    cout << "  Number of partial ways: " << osm_data->partial_ways << endl;
+    return osm_data;
 }
 
 bool StartsWith(const string& s, const string& prefix) {
@@ -492,7 +458,10 @@ json ToJson(const OsmModel::WayContainer& ways, bool full=false) {
     };
 }
 
-int StartServer(const OsmDataHolder& data) {
+int StartServer(const string& data_path, const string& state_path) {
+    OsmDataHolder data = OpenPbfData2(data_path, state_path);
+    cout << "Using data of state " << data->state << endl;
+
     Server svr;
     if (!svr.is_valid()) {
         cerr << "server has an error..." << endl;
@@ -503,11 +472,16 @@ int StartServer(const OsmDataHolder& data) {
         vector<Bbox<int64_t>> bboxes = ReadBboxes(req);
         if (bboxes.empty()) {
             res.status = 400;
+            cout << "/ways -> 400" << endl;
             return;
         }
         RequestParams params = ReadParams(req);
-        OsmModel::WayContainer ways = data.grid.SelectWaysByBbox(bboxes);
-        cerr << "Found " << ways.size() << " way(s)" << endl;
+        if (!data) {
+            res.status = 503;
+            cout << "/ways -> 503" << endl;
+            return;
+        }
+        OsmModel::WayContainer ways = data->grid.SelectWaysByBbox(bboxes);
         json message = {
             {"status", "success"},
             {"params", BboxesToString(bboxes)},
@@ -516,6 +490,7 @@ int StartServer(const OsmDataHolder& data) {
         res.set_header("Access-Control-Allow-Origin", "*");
         res.set_content(message.dump(), "application/json");
         res.status = 200;
+        cout << "/ways -> 200: found " << ways.size() << " ways" << endl;
     });
 
     svr.set_error_handler([](const Request & /*req*/, Response &res) {
@@ -525,12 +500,25 @@ int StartServer(const OsmDataHolder& data) {
         res.set_content(message.dump(), "application/json");
     });
 
-    cout << "server is listening on port " << kApiPort << endl;
+    thread reload_data_thread([&]() {
+        while (true) {
+            sleep(kReloadPeriodSeconds);
+            int64_t candidate = ReadState(state_path);
+            assert(bool(data));
+            if (candidate > data->state) {
+                cout << "New state is found. Trying to load..." << endl;
+                OsmDataHolder next_data = OpenPbfData2(data_path, state_path);
+                data.swap(next_data);
+                cout << "Using data of state " << data->state << endl;
+            }
+        }
+    });
+
+    cout << "Server is listening on port " << kApiPort << endl;
     svr.listen("localhost", kApiPort);
     return 0;
 }
 
 int main() {
-    OsmDataHolder holder = OpenPbfData2(kMapDataPath);
-    return StartServer(holder);
+    return StartServer(kMapDataPath, kStatePath);
 }
