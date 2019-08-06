@@ -1,0 +1,12 @@
+# add this with `crontab -e`
+
+#
+# Update OSM data once a day
+#
+
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+
+ROOTDIR="/skatemap_bundle/server"
+
+57 23 * * * $ROOTDIR/scripts/update_footways.py --root-dir $ROOTDIR >> $ROOTDIR/update_footways.out 2>> $ROOTDIR/update_footways.err

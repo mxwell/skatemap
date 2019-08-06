@@ -2,13 +2,17 @@
 
 set -xe
 
-export HOST="skatemap.khairulin.com"
+HOST="skatemap.khairulin.com"
+ROOTDIR="/skatemap_bundle"
 
 scp -r \
 	client/art \
 	client/css \
 	client/index.html \
 	client/js \
+	$HOST:$ROOTDIR/client
+
+scp -r \
+	scripts \
 	server/bazel-bin/riddimdim/riddimdim \
-	server/footways.pbf \
-	$HOST:skatemap_bundle
+	$HOST:$ROOTDIR/server
