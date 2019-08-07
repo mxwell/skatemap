@@ -62,6 +62,16 @@ function getStateFromMap() {
     };
 }
 
+function setTimestamp(value) {
+    const elems = document.getElementsByClassName("hidden");
+    if (elems.length === 0) {
+        return;
+    }
+    const elem = elems[0];
+    elem.innerHTML = "timestamp: " + value;
+    elem.classList.remove("hidden");
+}
+
 function receiveWaysData(data) {
     if (data.status !== "success") {
         console.log("Failed to get ways data. Status: " + data.status);
@@ -70,6 +80,9 @@ function receiveWaysData(data) {
     }
     var ways_data = data.result.ways;
     addWays(ways_data, getMyMap());
+    if ("data_timestamp" in data) {
+        setTimestamp(data.data_timestamp);
+    }
 }
 
 function makeBbox(w, s, e, n) {

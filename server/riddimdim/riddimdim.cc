@@ -31,6 +31,17 @@ const string kMapDataPath = "footways.pbf";
 const string kStatePath = "state.txt";
 const int kReloadPeriodSeconds = 15 * 60;
 
+bool StartsWith(const string& s, const string& prefix) {
+    size_t n = prefix.size();
+    if (s.size() < n)
+        return false;
+    for (size_t i = 0; i < n; ++i) {
+        if (s[i] != prefix[i])
+            return false;
+    }
+    return true;
+}
+
 class StreamBuffer {
     istream &stream;
     uint8_t *buffer;
@@ -284,12 +295,28 @@ vector<OsmModel::NodeHolder> ReadDenseNodes(const OSMPBF::DenseNodes &proto_node
     return result;
 }
 
-int64_t ReadState(const string& state_path) {
+int64_t ReadState(const string& state_path, string* timestamp = nullptr) {
     ifstream state_reader(state_path);
     assert(state_reader);
     int64_t result;
     state_reader >> result;
     assert(result >= 1000000000);  // sanity check
+    if (timestamp) {
+        string line;
+        const static string kTimestampPrefix = "timestamp=";
+        while (state_reader >> line) {
+            if (StartsWith(line, kTimestampPrefix)) {
+                string t = line.substr(kTimestampPrefix.size());
+                string t2;
+                for (char c : t) {
+                    if (c == '\\') continue;
+                    t2.push_back(c);
+                }
+                *timestamp = t2;
+                break;
+            }
+        }
+    }
     return result;
 }
 
@@ -300,6 +327,7 @@ struct OsmData {
     int skipped_ways = 0;
     int partial_ways = 0;
     int64_t state = 0;
+    string timestamp;
 
     OsmData(int cell_size) :
         grid(cell_size)
@@ -312,7 +340,10 @@ OsmDataHolder OpenPbfData2(const string& data_path, const string& state_path) {
     cout << "Loading data from " << data_path << " and " << state_path << endl;
     FileBlockReader reader(data_path);
     OsmDataHolder osm_data = make_shared<OsmData>(1e4);
-    osm_data->state = ReadState(state_path);
+    osm_data->state = ReadState(state_path, &(osm_data->timestamp));
+    if (!osm_data->timestamp.empty()) {
+        cout << "Timestamp: " << osm_data->timestamp << endl;
+    }
     while (reader.ReadBlock()) {
         if (reader.GetType() == kOSMData) {
             const OSMPBF::PrimitiveBlock& block = reader.GetPrimitiveBlock();
@@ -364,17 +395,6 @@ OsmDataHolder OpenPbfData2(const string& data_path, const string& state_path) {
     cout << "  Number of skipped ways: " << osm_data->skipped_ways << endl;
     cout << "  Number of partial ways: " << osm_data->partial_ways << endl;
     return osm_data;
-}
-
-bool StartsWith(const string& s, const string& prefix) {
-    size_t n = prefix.size();
-    if (s.size() < n)
-        return false;
-    for (size_t i = 0; i < n; ++i) {
-        if (s[i] != prefix[i])
-            return false;
-    }
-    return true;
 }
 
 vector<Bbox<int64_t>> ReadBboxes(const Request& req) {
@@ -487,6 +507,9 @@ int StartServer(const string& data_path, const string& state_path) {
             {"params", BboxesToString(bboxes)},
             {"result", ToJson(ways, params.full)},
         };
+        if (!data->timestamp.empty()) {
+            message["data_timestamp"] = data->timestamp;
+        }
         res.set_header("Access-Control-Allow-Origin", "*");
         res.set_content(message.dump(), "application/json");
         res.status = 200;

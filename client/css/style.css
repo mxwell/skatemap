@@ -12,6 +12,8 @@
   padding: 5px 1px;
   grid-area: footer;
   text-align: center;
+  display: inline-flex;
+  justify-content: space-between;
 }
 
 .wrapper {
@@ -59,4 +61,12 @@
 .plain-link {
   color: black;
   text-decoration: none;
+}
+
+.hidden {
+  display: none;
+}
+
+.timestamp {
+  font-size: 0.7em;
 }

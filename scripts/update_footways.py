@@ -65,11 +65,12 @@ class StateDownload(object):
     def __init__(self, root_dir):
         self.root_dir = root_dir
         self.output_dir = os.path.join(root_dir, "osm_data")
+        self.loaded_states = []
 
-    @staticmethod
-    def get_state(link):
+    def get_state(self, link):
         response = requests.get(link)
         response.raise_for_status()
+        self.loaded_states.append(response.text)
         return response.text
 
     def check_state(self, link, name):
@@ -149,6 +150,8 @@ class StateDownload(object):
         shutil.copyfile(source, destination)
         with open(state_destination, "w") as out:
             out.write("{}\n".format(int(time.time())))
+            for state in self.loaded_states:
+                out.write("{}\n".format(state))
         logging.info("Result: footways -> %s, state -> %s", destination, state_destination)
 
     def do(self):
