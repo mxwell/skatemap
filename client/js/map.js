@@ -230,7 +230,7 @@ function highlightPolyline(e) {
     L.DomEvent.stopPropagation(e);
 }
 
-function addWays(waysData, destinationMap) {
+function addWays(waysData) {
     var added = 0;
     var were_added = 0;
     Object.keys(waysData).forEach(function(way_num, index) {
@@ -246,6 +246,16 @@ function addWays(waysData, destinationMap) {
         ++added;
     });
     console.log("Added " + added + " way(s), also " + were_added + " way(s) were added already");
+}
+
+function clearWays() {
+    GRADE_COLORS.forEach(function(item, index) {
+        const group = GRADE_LAYER_GROUPS[item];
+        group.eachLayer(function (layer) {
+            layer.drawn = false;
+        });
+        group.clearLayers();
+    });
 }
 
 var LocateMe = L.control({

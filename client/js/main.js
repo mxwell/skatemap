@@ -79,7 +79,7 @@ function receiveWaysData(data) {
         return;
     }
     var ways_data = data.result.ways;
-    addWays(ways_data, getMyMap());
+    addWays(ways_data);
     if ("data_timestamp" in data) {
         setTimestamp(data.data_timestamp);
     }
@@ -154,6 +154,8 @@ function drawWays() {
     const zoom = mymap.getZoom();
     if (zoom < 15) {
         console.log(`Not loading new ways at zoom ${zoom} < 15`);
+        clearWays();
+        prevBounds = undefined;
         return;
     }
     const bboxes = getNewBboxes();
