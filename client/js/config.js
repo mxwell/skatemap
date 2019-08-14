@@ -67,6 +67,8 @@ const CONFIG_BASE_LAYER = "OSM";
 const CONFIG_MIN_ZOOM = 13;
 const CONFIG_MAX_ZOOM = 19;
 const CONFIG_DEFAULT_ZOOM = 17;
+const CONFIG_ENABLE_INCLINE = true;
+const CONFIG_INCLINE_THRESHOLD = 5;
 
 const POIs = {
     moscow: [55.743, 37.610],
