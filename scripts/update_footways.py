@@ -57,6 +57,8 @@ CITIES = [
              top=51.70, left=45.78, bottom=51.37, right=46.23, bbox_name="saratov"),
     CitySpec("http://download.openstreetmap.fr/extracts/russia/ural_federal_district/tyumen_oblast",
              top=57.29, left=65.34, bottom=57.06, right=65.83, bbox_name="tyumen"),
+    CitySpec("http://download.openstreetmap.fr/extracts/europe/france/ile_de_france/paris",
+             top=48.91, left=2.24, bottom=48.81, right=2.42, bbox_name="paris"),
 ]
 
 

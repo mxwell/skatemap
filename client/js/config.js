@@ -29,6 +29,7 @@ const TRANSLATIONS_EN_RU = {
     saint_petersburg: "Санкт-Петербург",
     saratov: "Саратов",
     tyumen: "Тюмень",
+    paris: "Paris",
 };
 
 const G_GREEN = "green";
@@ -75,6 +76,7 @@ const POIs = {
     saint_petersburg: [59.970860, 30.268775],
     saratov: [51.524958, 46.041146],
     tyumen: [57.151052, 65.537769],
+    paris: [48.868753, 2.350508],
 };
 
 const CITIES = [
@@ -82,4 +84,5 @@ const CITIES = [
     "saint_petersburg",
     "saratov",
     "tyumen",
+    "paris",
 ];
