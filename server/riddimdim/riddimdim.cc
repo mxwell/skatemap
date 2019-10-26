@@ -530,6 +530,7 @@ int StartServer(const string& data_path, const string& state_path) {
             assert(bool(data));
             if (candidate > data->state) {
                 cout << "New state is found. Trying to load..." << endl;
+                data.reset();
                 OsmDataHolder next_data = OpenPbfData2(data_path, state_path);
                 data.swap(next_data);
                 cout << "Using data of state " << data->state << endl;
